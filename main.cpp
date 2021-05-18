@@ -36,6 +36,14 @@ void clearScreen(char screen[HEIGHT][WIDTH]) {
   }
 }
 
+void initializeDepth(float d[HEIGHT][WIDTH]) {
+    for(int i = 0; i < HEIGHT; i++) {
+      for(int j = 0; j < WIDTH; j++) {
+          d[i][j] = 0;
+      }
+  }
+}
+
 class camera {
     public:
         float x,y,z,b,a,g;
@@ -82,7 +90,7 @@ class camera {
         //Convert point relative to camera to screen point
         void convertCamToScreen(float c[3], int screenCoords[2]) {
             float Ix = (-c[0]/c[2]) * fov;
-            float Iy = (-c[1]/c[2]) * fov;
+            float Iy = (c[1]/c[2]) * fov;
             screenCoords[0] = (int)(Ix * 5 + HEIGHT/2);
             screenCoords[1] = (int)(Iy * 5 + WIDTH/2);
         }
@@ -106,7 +114,7 @@ class camera {
             drawLine(screen,as,bs,c);
         }
 
-        void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior) {
+        void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH]) {
             // printf("rendering!");
             float a[3],b[3],c[3];
             int aIn,bIn,cIn;
@@ -141,41 +149,54 @@ class camera {
                     }
                 }
                 int as[2],asp[2],bs[2],bsp[2];
+                float asz,aspz,bsz,bspz;
+                asz = rest[0][2];
+                aspz = rest[1][2];
+                bsz = rest[2][2];
+                bspz = rest[3][2];
                 convertCamToScreen(rest[0],as);
                 convertCamToScreen(rest[1],asp);
                 convertCamToScreen(rest[2],bs);
                 convertCamToScreen(rest[3],bsp);
-                drawTriangle(screen,as,asp,bs,'X','X',drawInterior,drawInterior);
-                drawTriangle(screen,bs,bsp,asp,'X','X',drawInterior,drawInterior);
-                drawLine(screen,as,asp,'*');
-                drawLine(screen,as,bs,'*');
-                drawLine(screen,bs,bsp,'*');
+                // drawTriangle(screen,as,asp,bs,'X','X',drawInterior,drawInterior);
+                // drawTriangle(screen,bs,bsp,asp,'X','X',drawInterior,drawInterior);
+                // drawLine(screen,as,asp,'*');
+                // drawLine(screen,as,bs,'*');
+                // drawLine(screen,bs,bsp,'*');
+
+                drawDepthTriangle(screen,depth,as,1/asz,asp,1/aspz,bs,1/bspz,'.','*');
+                drawDepthTriangle(screen,depth,bs,1/bsz,bsp,1/bspz,asp,1/aspz,'.','*');
+
                 return;
             }
             int as[2],bs[2],cs[2];
             convertCamToScreen(a,as);
             convertCamToScreen(b,bs);
             convertCamToScreen(c,cs);
-            drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
+            // drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
+            drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],'.','*');
         }
 };
 
-int main()
+int main(int argc, char* argv[])
 {
   char screen[HEIGHT][WIDTH];
   clearScreen(screen);
-  vector<array<array<float,3>,3>> triangles = objReader("plane2.obj");
-//   for (array<array<float,3>,3> t : triangles) {
-//     printf("--------\n");
-//     for(int i = 0; i < 3; i++) {
-//         printf("--(");
-//         for (int j = 0; j < 3; j++) {
-//             printf(" %f ",t[i][j]);
-//         }
-//         printf(")--");
-//     }
-//     printf("\n");
-//   }
+  float depth[HEIGHT][WIDTH];
+  initializeDepth(depth);
+  string fileName;
+  if (argc == 1) {
+      fileName = "plane2.obj";
+  } else {
+      fileName = argv[1];
+  }
+  printf("%s",fileName.c_str());
+  vector<array<array<float,3>,3>> triangles = objReader(fileName);
+
+  float a[3] = {0,0,8};
+  float b[3] = {2,0,8};
+  float c[3] = {-2,2,8};
+
   float x = 0;
   float z = 0;
   float pitch = 0;
@@ -194,6 +215,7 @@ int main()
     }
     system("stty cooked");
     clearScreen(screen);
+    initializeDepth(depth);
     if (ch == 'w') {
         z+=0.1*cos(pitch);
         x-=0.1*sin(pitch);
@@ -230,10 +252,12 @@ int main()
     // for (int i = 0; i < 9; i++) {
     //     printf("%f,", cam.matrix[i]);
     // }
-    // printf(" ||| pitch: %f |||", pitch);
-    // printf("\n");
+    // printf(" ||| fov: %f |||", fov);
+    printf("\n");
     for (array<array<float,3>,3> tri : triangles)
-        cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false);
+        cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth);
+    // cam.renderTriangle(a,b,c,screen,false,depth);
+    
     printScreen(screen);
     // printf("\n %i, %i", a[0], a[1]);
     printf("\n");

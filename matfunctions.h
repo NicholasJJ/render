@@ -32,3 +32,4 @@ void lineSegmentPlaneIntercept(float a[3], float b[3], float d, float out[3]) {
 bool m3(float a[3], float b[3]) {
     return (a[2] < b[2]);
 }
+
