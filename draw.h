@@ -5,7 +5,7 @@
 using namespace std;
 
 #define HEIGHT 40
-#define WIDTH 40
+#define WIDTH 140
 
 void drawPoint(char screen[HEIGHT][WIDTH], int x, int y, char c) {
     if (x < 0 || y < 0 || x >= HEIGHT || y >= WIDTH)
@@ -116,13 +116,29 @@ bool outOfView(int p[2]) {
     return (p[0] < 0 || p[1] < 0 || p[0] > HEIGHT - 1 || p[1] > WIDTH - 1);
 }
 
+bool left(int a[2], int b[2], int c[2]) {
+    return (a[1] < 0 && b[1] < 0 && c[1] < 0);
+}
+
+bool right(int a[2], int b[2], int c[2]) {
+    return (a[1] > WIDTH - 1 && b[1] > WIDTH - 1 && c[1] > WIDTH - 1);
+}
+
+bool top(int a[2], int b[2], int c[2]) {
+    return (a[0] > HEIGHT - 1 && b[0] > HEIGHT - 1 && c[0] > HEIGHT - 1);
+}
+
+bool bottom(int a[2], int b[2], int c[2]) {
+    return (a[0] < 0 && b[0] < 0 && c[0] < 0);
+}
+
 void drawDepthLine(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int am[2], float z0, int bm[2], float z1, char d, bool bump = true) {
     point p0((float)am[0],(float)am[1]);
     point p1((float)bm[0],(float)bm[1]);
     float N = diagonalDistance(p0,p1);
     float nudge = 0;
     if (bump)
-        nudge = .0f;
+        nudge = .01f;
     for (float step = 0; step <= N; step++) {
         float t = step / N;
         point ip = lerpPoint(p0, p1, t);
@@ -140,7 +156,8 @@ void drawDepthLine(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int a
 //arrays should be {x,y,1/z}
 void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int a[2], float az, int b[2], float bz, int c[2], float cz, char inChar, char edgeChar) {
 
-    if (outOfView(a) && outOfView(b) && outOfView(c))
+    //culling partial triangles doesn't speed up much (and it might create 2 triangles), so this was is simpler and is probably good enough.
+    if (top(a,b,c) || bottom(a,b,c) || left(a,b,c) || right(a,b,c))
         return;
 
     //Sort points bottom to top so a.y <= b.y <= c.y
@@ -151,7 +168,7 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
     if (c[1] < b[1])
         swapArray(c,&cz,b,&bz);
 
-    printf("0:(%i,%i,%f) 1:(%i,%i,%f) 2:(%i,%i,%f)\n", a[0],a[1],az,b[0],b[1],bz,c[0],c[1],cz);
+    // printf("0:(%i,%i,%f) 1:(%i,%i,%f) 2:(%i,%i,%f)\n", a[0],a[1],az,b[0],b[1],bz,c[0],c[1],cz);
 
     //get z and x data for edges of triangle;
     vector<float> x01 = lerpLine(a[1], (float) a[0], b[1], (float) b[0]);
@@ -163,17 +180,17 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
     vector<float> x02 = lerpLine(a[1], (float) a[0], c[1], (float) c[0]);
     vector<float> z02 = lerpLine(a[1], az, c[1], cz);
 
-    printf("x01:  ");
-    for (int i = 0; i < x01.size(); i++)
-        printf("%f  ", x01[i]);
+    // printf("x01:  ");
+    // for (int i = 0; i < x01.size(); i++)
+    //     printf("%f  ", x01[i]);
 
-    printf("\nx12:  ");
-    for (int i = 0; i < x12.size(); i++)
-        printf("%f  ", x12[i]);
+    // printf("\nx12:  ");
+    // for (int i = 0; i < x12.size(); i++)
+    //     printf("%f  ", x12[i]);
 
-    printf("\nx02:  ");
-    for (int i = 0; i < x02.size(); i++)
-        printf("%f  ", x02[i]);
+    // printf("\nx02:  ");
+    // for (int i = 0; i < x02.size(); i++)
+    //     printf("%f  ", x02[i]);
 
     //make 01 the 012 line
     x01.pop_back();
@@ -181,9 +198,9 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
     z01.pop_back();
     z01.insert(z01.end(), z12.begin(), z12.end());
 
-    printf("\nx012:  ");
-    for (int i = 0; i < x01.size(); i++)
-        printf("%f  ", x01[i]);
+    // printf("\nx012:  ");
+    // for (int i = 0; i < x01.size(); i++)
+    //     printf("%f  ", x01[i]);
 
     for (int y = a[1]; y <= c[1]; y++) {
         int p0x = round(x01[y - a[1]]);

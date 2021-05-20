@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
       fileName = argv[1];
   }
   printf("%s",fileName.c_str());
-  vector<array<array<float,3>,3>> triangles = objReader(fileName);
+  vector<array<array<float,3>,4>> triangles = objReader(fileName);
 
   float a[3] = {0,0,8};
   float b[3] = {2,0,8};
@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
     // }
     // printf(" ||| fov: %f |||", fov);
     printf("\n");
-    for (array<array<float,3>,3> tri : triangles)
+    for (array<array<float,3>,4> tri : triangles)
         cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth);
     // cam.renderTriangle(a,b,c,screen,false,depth);
     
