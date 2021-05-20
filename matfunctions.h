@@ -1,4 +1,5 @@
 #include <cmath>
+#include <array>
 
 float dotProduct(float a[], float b[]) {
     // int arrlength = sizeof(a)/sizeof(a[0]);
@@ -7,6 +8,20 @@ float dotProduct(float a[], float b[]) {
         sum += a[i] * b[i];
     }
     return sum;
+}
+
+array<float,3> AminusB(array<float,3> a, array<float,3> b) {
+    return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+}
+
+bool normFacingCamera(array<float,3> normal, array<float,3> triVertex, array<float,3> camPos) {
+    //first, get the vector going from triVertex to camPos
+    array<float,3> v = AminusB(camPos,triVertex);
+    if (dotProduct(&normal[0],&v[0]) <= 0) {
+        return false;
+    } else {
+        return true;
+    }
 }
 
 // void camVectorMult(float m[12], float v[3], float out[3]) {

@@ -176,6 +176,9 @@ class camera {
             // drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
             drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],'.','*');
         }
+        array<float,3> position() {
+            return {x,y,z};
+        }
 };
 
 int main(int argc, char* argv[])
@@ -254,8 +257,11 @@ int main(int argc, char* argv[])
     // }
     // printf(" ||| fov: %f |||", fov);
     printf("\n");
-    for (array<array<float,3>,4> tri : triangles)
-        cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth);
+    array<float,3> camPos = cam.position();
+    for (array<array<float,3>,4> tri : triangles) {
+        if (normFacingCamera(tri[3],tri[0],camPos))
+            cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth); 
+    }
     // cam.renderTriangle(a,b,c,screen,false,depth);
     
     printScreen(screen);
