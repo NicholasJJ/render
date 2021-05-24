@@ -1,5 +1,9 @@
 #include <cmath>
 #include <array>
+#include <math.h> 
+#include <cstring>
+
+char palette[]=".,-~:;=!*#OB8%&";
 
 float dotProduct(float a[], float b[]) {
     // int arrlength = sizeof(a)/sizeof(a[0]);
@@ -8,6 +12,15 @@ float dotProduct(float a[], float b[]) {
         sum += a[i] * b[i];
     }
     return sum;
+}
+
+float length(float v[]) {
+    return sqrt((v[0]*v[0]) + (v[1]*v[1]) + (v[2]*v[2]));
+}
+
+array<float,3> unit(array<float,3> v) {
+    float l = length(&v[0]);
+    return {v[0]/l,v[1]/l,v[2]/l};
 }
 
 array<float,3> AminusB(array<float,3> a, array<float,3> b) {
@@ -38,10 +51,18 @@ void camVectorMult(float m[12], float v[3], float out[3]) {
 
 //the intersection of the line segment a-b and the near clipping plane at z=d
 void lineSegmentPlaneIntercept(float a[3], float b[3], float d, float out[3]) {
-    float c = (d-a[2])/(a[2]-b[2]);
-    out[0] = (c*(a[0]-b[0]))+a[0];
-    out[1] = (c*(a[1]-b[1]))+a[1];
+    float c = (a[2]-d)/(a[2]-b[2]);
+    out[0] = (c*(b[0]-a[0]))+a[0];
+    out[1] = (c*(b[1]-a[1]))+a[1];
     out[2] = d;
+
+}
+
+//both vectors must be unit vectors
+char luminance(array<float,3> normal, array<float,3> light) {
+    float l = clamp(dotProduct(&normal[0],&light[0]),(float)0,(float)1);
+    int c = (int)(l * (float)(strlen(palette)-1));
+    return palette[c];
 }
 
 bool m3(float a[3], float b[3]) {

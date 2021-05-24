@@ -7,6 +7,7 @@
 #include "draw.h"
 #include "matfunctions.h"
 #include "objReader.h"
+#include <math.h>
 #define PI 3.14159265358979323846
 #define NEAR 0.05
 using namespace std;
@@ -114,7 +115,15 @@ class camera {
             drawLine(screen,as,bs,c);
         }
 
-        void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH]) {
+        void renderOrthoTriangle(float am[3], float bm[3], float cm[3]) {
+            float a[3],b[3],c[3];
+            convertWorldToCam(am,a);
+            convertWorldToCam(bm,b);
+            convertWorldToCam(cm,c);
+            
+        }
+
+        void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH], char color) {
             // printf("rendering!");
             float a[3],b[3],c[3];
             int aIn,bIn,cIn;
@@ -164,8 +173,8 @@ class camera {
                 // drawLine(screen,as,bs,'*');
                 // drawLine(screen,bs,bsp,'*');
 
-                drawDepthTriangle(screen,depth,as,1/asz,asp,1/aspz,bs,1/bspz,'.','*');
-                drawDepthTriangle(screen,depth,bs,1/bsz,bsp,1/bspz,asp,1/aspz,'.','*');
+                drawDepthTriangle(screen,depth,as,1/asz,asp,1/aspz,bs,1/bspz,color,color);
+                drawDepthTriangle(screen,depth,bs,1/bsz,bsp,1/bspz,asp,1/aspz,color,color);
 
                 return;
             }
@@ -174,7 +183,7 @@ class camera {
             convertCamToScreen(b,bs);
             convertCamToScreen(c,cs);
             // drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
-            drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],'.','*');
+            drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],color,color);
         }
         array<float,3> position() {
             return {x,y,z};
@@ -195,6 +204,23 @@ int main(int argc, char* argv[])
   }
   printf("%s",fileName.c_str());
   vector<array<array<float,3>,4>> triangles = objReader(fileName);
+
+  array<float, 3> light = {0,1,-1};
+  array<float, 3> unitLight = unit(light);
+
+  //Light Triangles
+  char lit[triangles.size()];
+  for (int i = 0; i < triangles.size(); i++) {
+    array<float, 3> unitNorm = unit(triangles[i][3]);
+    lit[i] = luminance(unitNorm,unitLight);
+  }
+
+  //construct light distance array
+  float lrAngle = atan(light[0]/light[2]);
+  float temp = sqrt((light[0]*light[0]) + (light[2]*light[2]));
+  float udAngle = atan(light[1]/temp);
+  camera lightCam(0,0,0,lrAngle,0,udAngle,1);
+
 
   float a[3] = {0,0,8};
   float b[3] = {2,0,8};
@@ -257,11 +283,21 @@ int main(int argc, char* argv[])
     // }
     // printf(" ||| fov: %f |||", fov);
     printf("\n");
+
+    //Render Triangles
     array<float,3> camPos = cam.position();
-    for (array<array<float,3>,4> tri : triangles) {
-        if (normFacingCamera(tri[3],tri[0],camPos))
-            cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth); 
+    for (int i = 0; i < triangles.size(); i++) {
+        array<array<float,3>,4> tri = triangles[i];
+        if (normFacingCamera(tri[3],tri[0],camPos)) {
+            cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth, lit[i]);
+        } 
     }
+
+    // for (array<array<float,3>,4> tri : triangles) {
+    //     if (normFacingCamera(tri[3],tri[0],camPos)) {
+    //         cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth,);
+    //     }  
+    // }
     // cam.renderTriangle(a,b,c,screen,false,depth);
     
     printScreen(screen);

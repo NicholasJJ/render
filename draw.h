@@ -211,49 +211,6 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
         float p1z = z02[y - a[1]];
         drawDepthLine(screen,depth,p0,p0z,p1,p1z,inChar, false);
     }
-    
-    // vector<float> xLline;
-    // vector<float> xRline;
-    // vector<float> zLline;
-    // vector<float> zRline;
-    // //determine if 012 of 02 has the lower x values
-    // int m = x01.size()/2;
-    // printf("\nm=%i\n",m);
-    // if (x01[m] < x02[m]) {
-    //     xLline = x01; zLline = z01; xRline = x02; zRline = z02;
-    // } else {
-    //     xRline = x01; zRline = z01; xLline = x02; zLline = z02;
-    // }
-    // printf("\nLeft:  ");
-    // for (int i = 0; i < xLline.size(); i++)
-    //     printf("%f  ", xLline[i]);
-    // printf("\nRight:  ");
-    // for (int i = 0; i < xRline.size(); i++)
-    //     printf("%f  ", xRline[i]);
-    // //for each y pixel, draw the horizontal line form xLline to xRline;
-    // for (int y = a[1]; y <= c[1]; y++) {
-    //     if (y < 0 || y > WIDTH)
-    //         continue;
-    //     printf("fl,fr = %f,%f",xLline[y - a[1]],xRline[y - a[1]]);
-    //     int xl = round(xLline[y - a[1]]);
-    //     int xr = round(xRline[y - a[1]]);
-    //     printf("y= %i  l,r = %i,%i\n",y, xl,xr);
-    //     vector<float> zhorizontal = lerpLine(xl, zLline[y - a[1]], xr, zRline[y - a[1]]);
-    //     for (int x = xl; x <= xr; x++) {
-    //         if (x < 0 || x > HEIGHT)
-    //             continue;
-    //         float z = zhorizontal[x - xl];
-    //         // printf("x,y = %i,%i\n", x,y);
-    //         if (z > depth[x][y]) {
-    //             depth[x][y] = z;
-    //             drawPoint(screen, x, y, inChar);
-    //             // printf("2\n");
-    //         } else {
-    //             printf("occluded!!!!!!!!!!!!!!!!\n");
-    //         }
-    //     }
-        
-    // }
 
     //do edges
     drawDepthLine(screen,depth,a,az,b,bz,edgeChar);
