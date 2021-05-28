@@ -8,6 +8,7 @@
 #include "matfunctions.h"
 #include "objReader.h"
 #include <math.h>
+#include <unordered_map>
 #define PI 3.14159265358979323846
 #define NEAR 0.05
 using namespace std;
@@ -115,14 +116,6 @@ class camera {
             drawLine(screen,as,bs,c);
         }
 
-        void renderOrthoTriangle(float am[3], float bm[3], float cm[3]) {
-            float a[3],b[3],c[3];
-            convertWorldToCam(am,a);
-            convertWorldToCam(bm,b);
-            convertWorldToCam(cm,c);
-            
-        }
-
         void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH], char color) {
             // printf("rendering!");
             float a[3],b[3],c[3];
@@ -185,6 +178,15 @@ class camera {
             // drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
             drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],color,color);
         }
+
+        void renderOrthoTriangle(float am[3], float bm[3], float cm[3], unordered_map<int, unordered_map<int,float>> m) {
+            float a[3],b[3],c[3];
+            convertWorldToCam(am,a);
+            convertWorldToCam(bm,b);
+            convertWorldToCam(cm,c);
+            addTriToDist(m,a,b,c);
+        }
+
         array<float,3> position() {
             return {x,y,z};
         }
@@ -192,6 +194,7 @@ class camera {
 
 int main(int argc, char* argv[])
 {
+  printf("start");
   char screen[HEIGHT][WIDTH];
   clearScreen(screen);
   float depth[HEIGHT][WIDTH];
@@ -216,10 +219,14 @@ int main(int argc, char* argv[])
   }
 
   //construct light distance array
+  unordered_map<int, unordered_map<int,float>> distToL; 
   float lrAngle = atan(light[0]/light[2]);
   float temp = sqrt((light[0]*light[0]) + (light[2]*light[2]));
   float udAngle = atan(light[1]/temp);
   camera lightCam(0,0,0,lrAngle,0,udAngle,1);
+  for (array<array<float,3>,4> tri : triangles) {
+      lightCam.renderOrthoTriangle(&tri[0][0],&tri[1][0],&tri[2][0], distToL);
+  }
 
 
   float a[3] = {0,0,8};
