@@ -3,12 +3,13 @@
 #include <cmath>
 #include <vector>
 #include <unordered_map>
+#include "matfunctions.h"
 using namespace std;
 
 #define HEIGHT 40
 #define WIDTH 140
 
-#define SHADOWRESOLUTION 15
+#define SHADOWRESOLUTION 2
 
 void drawPoint(char screen[HEIGHT][WIDTH], int x, int y, char c) {
     if (x < 0 || y < 0 || x >= HEIGHT || y >= WIDTH)
@@ -142,15 +143,36 @@ bool bottom(int a[2], int b[2], int c[2]) {
     return (a[0] < 0 && b[0] < 0 && c[0] < 0);
 }
 
+bool inLight(int screenX, int screenY, float invZFromCam, float c2l[16], unordered_map<int, unordered_map<int,float>> l2h) {
+    //convert screen to cam coords, since z is really 1/z we divide instead of multiply
+    float camCoords[3];
+    camCoords[0] = ((float)screenX) / invZFromCam;
+    camCoords[1] = ((float)screenY) / invZFromCam;
+    camCoords[2] = 1/invZFromCam;
+    //Convert cam coords to light coords
+    float lightCoords[3];
+    int roundedLightCoords[2];
+    camVectorMult(c2l,camCoords,lightCoords);
+    for (int i = 0; i < 2; i++) {
+        roundedLightCoords[i] = round(lightCoords[i] * SHADOWRESOLUTION);
+    }
+    //Check if point has highest z
+    printf("%f     ", l2h[roundedLightCoords[0]][roundedLightCoords[1]]);
+    if (l2h[roundedLightCoords[0]][roundedLightCoords[1]] <= lightCoords[2]) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
-
-void drawDepthLine(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int am[2], float z0, int bm[2], float z1, char d, bool bump = true) {
+vector<array<float,3>> drawDepthLine(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int am[2], float z0, int bm[2], float z1, char d, bool bump = true) {
     point p0((float)am[0],(float)am[1]);
     point p1((float)bm[0],(float)bm[1]);
     float N = diagonalDistance(p0,p1);
     float nudge = 0;
     if (bump)
         nudge = .01f;
+    vector<array<float,3>> ret;
     for (float step = 0; step <= N; step++) {
         float t = step / N;
         point ip = lerpPoint(p0, p1, t);
@@ -160,17 +182,23 @@ void drawDepthLine(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int a
         int xy[2] = {x,y};
         if (!outOfView(xy) && z >= depth[x][y] - nudge) {
             depth[x][y] = z;
-            drawPoint(screen, x, y, d);
+            // if (!inLight(x,y,z,c2l,l2h)) {
+            //     d = '.';
+            // }
+            // drawPoint(screen, x, y, d);
+            ret.push_back({(float)x,(float)y,z});
         }
     }
+    return ret;
 }
 
 //arrays should be {x,y,1/z}
-void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int a[2], float az, int b[2], float bz, int c[2], float cz, char inChar, char edgeChar) {
+vector<array<float,3>> drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], int a[2], float az, int b[2], float bz, int c[2], float cz, char inChar, char edgeChar) {
 
     //culling partial triangles doesn't speed up much (and it might create 2 triangles), so this was is simpler and is probably good enough.
+    vector<array<float,3>> pixels;
     if (top(a,b,c) || bottom(a,b,c) || left(a,b,c) || right(a,b,c))
-        return;
+        return pixels;
 
     //Sort points bottom to top so a.y <= b.y <= c.y
     if (b[1] < a[1])
@@ -213,7 +241,7 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
     // printf("\nx012:  ");
     // for (int i = 0; i < x01.size(); i++)
     //     printf("%f  ", x01[i]);
-
+    
     for (int y = a[1]; y <= c[1]; y++) {
         int p0x = round(x01[y - a[1]]);
         int p0[2] = {p0x, y};
@@ -221,16 +249,19 @@ void drawDepthTriangle(char screen[HEIGHT][WIDTH], float depth[HEIGHT][WIDTH], i
         int p1x = round(x02[y - a[1]]);
         int p1[2] = {p1x, y};
         float p1z = z02[y - a[1]];
-        drawDepthLine(screen,depth,p0,p0z,p1,p1z,inChar, false);
+        vector<array<float,3>> n = drawDepthLine(screen,depth,p0,p0z,p1,p1z,inChar,false);
+        pixels.insert(pixels.end(),n.begin(),n.end());
     }
+    return pixels;
 
     //do edges
-    drawDepthLine(screen,depth,a,az,b,bz,edgeChar);
-    drawDepthLine(screen,depth,a,az,c,cz,edgeChar);
-    drawDepthLine(screen,depth,c,cz,b,bz,edgeChar);
+    // drawDepthLine(screen,depth,a,az,b,bz,edgeChar,c2l,l2h);
+    // drawDepthLine(screen,depth,a,az,c,cz,edgeChar,c2l,l2h);
+    // drawDepthLine(screen,depth,c,cz,b,bz,edgeChar,c2l,l2h);
 }
 
-void addLineToDist(unordered_map<int, unordered_map<int,float>> m, int am[2], float z0, int bm[2], float z1) {
+vector<array<float,3>> addLineToDist(int am[2], float z0, int bm[2], float z1) {
+    vector<array<float,3>> ret;
     point p0((float)am[0],(float)am[1]);
     point p1((float)bm[0],(float)bm[1]);
     float N = diagonalDistance(p0,p1);
@@ -240,17 +271,21 @@ void addLineToDist(unordered_map<int, unordered_map<int,float>> m, int am[2], fl
         float z = lerp(z0,z1,t);
         int x = round(ip.x);
         int y = round(ip.y);
-        if (m[x][y] == 0 || m[x][y] < z) {
-            // printf("Set %i,%i to %f",x,y,z);
-            m[x][y] = z;
-        } else {
-            // printf("%f remain the champ", m[x][y]);
-        }
+        ret.push_back({ip.x,ip.y,z});
+        // if (m[x][y] == 0 || m[x][y] < z) {
+        //     // printf("Set %i,%i to %f",x,y,z);
+        //     m[x][y] = z;
+        //     // printf(" it is now %f     ", m[x][y]);
+        // } else {
+        //     // printf("%f remain the champ", m[x][y]);
+        // }
         
     }
+    return ret;
 }
 
-void addTriToDist(unordered_map<int, unordered_map<int,float>> m, float af[3], float bf[3], float cf[3]) {
+vector<array<float,3>> addTriToDist(float af[3], float bf[3], float cf[3]) {
+    vector<array<float,3>> ret;
     //Convert float cordinates to ints;
     int ax = round(af[0] * SHADOWRESOLUTION);
     int ay = round(af[1] * SHADOWRESOLUTION);
@@ -297,8 +332,10 @@ void addTriToDist(unordered_map<int, unordered_map<int,float>> m, float af[3], f
         int p1x = round(x02[y - a[1]]);
         int p1[2] = {p1x, y};
         float p1z = z02[y - a[1]];
-        addLineToDist(m,p0,p0z,p1,p1z);
+        vector<array<float,3>> n = addLineToDist(p0,p0z,p1,p1z);
+        ret.insert(ret.end(),n.begin(),n.end());
     }
+    return ret;
 }
 
 void moveDot(char screen[HEIGHT][WIDTH], int p[4]) {

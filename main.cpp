@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include "draw.h"
-#include "matfunctions.h"
+
 #include "objReader.h"
 #include <math.h>
 #include <unordered_map>
@@ -49,7 +49,7 @@ void initializeDepth(float d[HEIGHT][WIDTH]) {
 class camera {
     public:
         float x,y,z,b,a,g;
-        float matrix[9];
+        float matrix[16];
         float fov;
         camera(float ix,float iy,float iz,float ipitch,float iyaw, float iroll, float ifov) {
             x=ix;y=iy;z=iz;b=ipitch;a=iyaw;g=iroll;fov=ifov;
@@ -67,21 +67,28 @@ class camera {
             matrix[0] = (cos(a)*cos(b)) - (sin(a)*sin(b)*sin(g));
             matrix[1] = -sin(a)*cos(g);
             matrix[2] = (cos(a)*sin(b)) + (sin(a)*cos(b)*sin(g));
-            matrix[3] = (sin(a)*cos(b)) + (cos(a)*sin(b)*sin(g));
-            matrix[4] = cos(a)*cos(g);
-            matrix[5] = (sin(a)*sin(b)) - (cos(a)*cos(b)*sin(g));
-            matrix[6] = -sin(b)*cos(g);
-            matrix[7] = sin(g);
-            matrix[8] = cos(b)*cos(g);
+            matrix[4] = (sin(a)*cos(b)) + (cos(a)*sin(b)*sin(g));
+            matrix[5] = cos(a)*cos(g);
+            matrix[6] = (sin(a)*sin(b)) - (cos(a)*cos(b)*sin(g));
+            matrix[8] = -sin(b)*cos(g);
+            matrix[9] = sin(g);
+            matrix[10] = cos(b)*cos(g);
+            matrix[3] = -(matrix[0]*x + matrix[1]*y + matrix[2]*z);
+            matrix[7] = -(matrix[4]*x + matrix[5]*y + matrix[6]*z);
+            matrix[11] = -(matrix[8]*x + matrix[9]*y + matrix[10]*z);
+            matrix[12] = 0;
+            matrix[13] = 0;
+            matrix[14] = 0;
+            matrix[15] = 1;
         }
         //Covert worldpoint to point relative to camera, returns 0 if the resulting point can't be rendered
         int convertWorldToCam(float v[3], float camCoords[3]) {
             // printf("%f,%f,%f --->", v[0],v[1],v[2]);
-            float temp[3];
-            temp[0] = v[0] - x;
-            temp[1] = v[1] - y;
-            temp[2] = v[2] - z;
-            camVectorMult(matrix,temp,camCoords);
+            // float temp[3];
+            // temp[0] = v[0] - x;
+            // temp[1] = v[1] - y;
+            // temp[2] = v[2] - z;
+            camVectorMult(matrix,v,camCoords);
             if (camCoords[2] < NEAR) {
                 // printf("can't render point");
                 return 0;
@@ -95,6 +102,15 @@ class camera {
             float Iy = (c[1]/c[2]) * fov;
             screenCoords[0] = (int)(Ix * 5 + HEIGHT/2);
             screenCoords[1] = (int)(Iy * 5 + WIDTH/2);
+        }
+
+        //Scrren should be screenX,screenY, 1/camZ;
+        void convertScreenToCam(float screen[3], float world[3]) {
+            float Ix = (screen[0] - (HEIGHT/2))/5;
+            float Iy = (screen[1] - (WIDTH/2))/5;
+            world[0] = -(Ix/fov)/screen[2];
+            world[1] = (Iy/fov)/screen[2];
+            world[2] = 1/screen[2];
         }
 
         void renderPoint(float vm[3], char c, char screen[HEIGHT][WIDTH]) {
@@ -116,15 +132,20 @@ class camera {
             drawLine(screen,as,bs,c);
         }
 
-        void renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH], char color) {
+        vector<array<float,3>> renderTriangle(float am[3], float bm[3], float cm[3], char screen[HEIGHT][WIDTH], bool drawInterior, float depth[HEIGHT][WIDTH], char color) {
             // printf("rendering!");
             float a[3],b[3],c[3];
             int aIn,bIn,cIn;
             aIn = convertWorldToCam(am,a);
             bIn = convertWorldToCam(bm,b);
             cIn = convertWorldToCam(cm,c);
+            // float al[3],bl[3],cl[3];
+            // LC.convertWorldToCam(am,al);
+            // LC.convertWorldToCam(bm,bl);
+            // LC.convertWorldToCam(cm,cl);
             if (aIn + bIn + cIn == 0) {
-                return;
+                vector<array<float,3>> nothing;
+                return nothing;
             }
             if (aIn + bIn + cIn == 1) {
                 float* t;
@@ -166,35 +187,69 @@ class camera {
                 // drawLine(screen,as,bs,'*');
                 // drawLine(screen,bs,bsp,'*');
 
-                drawDepthTriangle(screen,depth,as,1/asz,asp,1/aspz,bs,1/bspz,color,color);
-                drawDepthTriangle(screen,depth,bs,1/bsz,bsp,1/bspz,asp,1/aspz,color,color);
+                vector<array<float,3>> t1 = drawDepthTriangle(screen,depth,as,1/asz,asp,1/aspz,bs,1/bspz,color,color);
+                vector<array<float,3>> t2 = drawDepthTriangle(screen,depth,bs,1/bsz,bsp,1/bspz,asp,1/aspz,color,color);
+                t1.insert(t1.end(),t2.begin(),t2.end());
 
-                return;
+                return t1;
             }
             int as[2],bs[2],cs[2];
             convertCamToScreen(a,as);
             convertCamToScreen(b,bs);
             convertCamToScreen(c,cs);
             // drawTriangle(screen,as,bs,cs,'X','*',drawInterior,true);
-            drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],color,color);
+            return drawDepthTriangle(screen, depth, as, 1/a[2], bs, 1/b[2], cs, 1/c[2],color,color);
         }
 
-        void renderOrthoTriangle(float am[3], float bm[3], float cm[3], unordered_map<int, unordered_map<int,float>> m) {
+        vector<array<float,3>> renderOrthoTriangle(float am[3], float bm[3], float cm[3]) {
             float a[3],b[3],c[3];
             convertWorldToCam(am,a);
             convertWorldToCam(bm,b);
             convertWorldToCam(cm,c);
-            addTriToDist(m,a,b,c);
+            return addTriToDist(a,b,c);
         }
 
         array<float,3> position() {
             return {x,y,z};
         }
+
+        void SetAsCameraMatrix(float m[16]) {
+            for (int i = 0; i< 16; i++) {
+                m[i] = matrix[i];
+            }
+            return;
+        }
 };
+
+void change(unordered_map<int, float> test) {
+    printf("\n %f \n", test[1]);
+    return;
+}
+
+void print4x4(float m[16]) {
+    printf("\n");
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 4; col++) {
+            printf("%f  ",m[(4*row)+col]);
+        }
+        printf("\n");
+    }
+}
 
 int main(int argc, char* argv[])
 {
   printf("start");
+
+//   unordered_map<int, float> test;
+//   test[1] = 5;
+//   change(test);
+  
+//   return 1;
+
+
+
+
+
   char screen[HEIGHT][WIDTH];
   clearScreen(screen);
   float depth[HEIGHT][WIDTH];
@@ -208,7 +263,7 @@ int main(int argc, char* argv[])
   printf("%s",fileName.c_str());
   vector<array<array<float,3>,4>> triangles = objReader(fileName);
 
-  array<float, 3> light = {0,1,-1};
+  array<float, 3> light = {-1,1,1};
   array<float, 3> unitLight = unit(light);
 
   //Light Triangles
@@ -219,14 +274,32 @@ int main(int argc, char* argv[])
   }
 
   //construct light distance array
+  float lightMat[16];
   unordered_map<int, unordered_map<int,float>> distToL; 
   float lrAngle = atan(light[0]/light[2]);
   float temp = sqrt((light[0]*light[0]) + (light[2]*light[2]));
   float udAngle = atan(light[1]/temp);
+  lrAngle *= -1;
+//   udAngle += PI;
   camera lightCam(0,0,0,lrAngle,0,udAngle,1);
+  lightCam.SetAsCameraMatrix(lightMat);
   for (array<array<float,3>,4> tri : triangles) {
-      lightCam.renderOrthoTriangle(&tri[0][0],&tri[1][0],&tri[2][0], distToL);
+    //   printf("returned");
+      vector<array<float,3>> n = lightCam.renderOrthoTriangle(&tri[0][0],&tri[1][0],&tri[2][0]);
+      for (array<float,3> point : n) {
+          int px = round(point[0]);
+          int py = round(point[1]);
+          float pz = point[2];
+          if (distToL[px][py] == 0 || distToL[px][py] < pz) {
+            // printf("Set %i,%i to %f",x,y,z);
+            distToL[px][py] = pz;
+            // printf(" it is now %f     ", m[x][y]);
+          } else {
+            // printf("%f remain the champ", m[x][y]);
+          }
+      }
   }
+  printf("%f",distToL[-62][-36]);
 
 
   float a[3] = {0,0,8};
@@ -239,6 +312,7 @@ int main(int argc, char* argv[])
   float yaw = 0;
   float roll = 0;
   float fov = 6.8;
+  float teh = 0;
   printScreen(screen);
   char ch;
   system("stty raw");//seting the terminal in raw mode
@@ -284,19 +358,64 @@ int main(int argc, char* argv[])
         fov-= .03;
     if (ch == 'm')
         fov+= .03;
-    camera cam(x,1,z + 0.5,pitch,roll - PI/2,yaw,fov);
-    // for (int i = 0; i < 9; i++) {
-    //     printf("%f,", cam.matrix[i]);
-    // }
+    if (ch == '9')
+        teh+= 1;
+    if (ch == '0')
+        teh-= 1;
+
+    camera cam(x,1,z,pitch,roll - PI/2,yaw,fov);
+    float camMat[16];
+    cam.SetAsCameraMatrix(camMat);
+    float camMatInv[16];
+    invert(camMatInv,camMat);
+    float camSpaceToLightSpace[16];
+    matMult(camSpaceToLightSpace,lightMat,camMatInv);
+    
     // printf(" ||| fov: %f |||", fov);
     printf("\n");
 
+    // print4x4(camMat);
+    // print4x4(camMatInv);
     //Render Triangles
     array<float,3> camPos = cam.position();
     for (int i = 0; i < triangles.size(); i++) {
         array<array<float,3>,4> tri = triangles[i];
         if (normFacingCamera(tri[3],tri[0],camPos)) {
-            cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth, lit[i]);
+            vector<array<float,3>> p = cam.renderTriangle(&tri[0][0],&tri[1][0],&tri[2][0],screen,false, depth, lit[i]);
+            for (array<float,3> pix : p) {
+                float relativeCamPos[3];
+                cam.convertScreenToCam(&pix[0],relativeCamPos);
+                float worldPos[3];
+                // float temp;
+                // temp = relativeCamPos[0]; relativeCamPos[0] = relativeCamPos[1]; relativeCamPos[1] = temp;
+                camVectorMult(camMatInv,relativeCamPos,worldPos);
+                char ch = '.';
+                // if (relativeCamPos[2] > teh && relativeCamPos[1] > teh) {
+                //     ch = '!';
+                // } else if (relativeCamPos[2] > teh) {
+                //     ch = '?';
+                // } else if (relativeCamPos[1] > teh) {
+                //     ch = '&';
+                // }
+
+                // check if in light
+                float lightCoords[3];
+                int roundedLightCoords[2];
+                camVectorMult(lightMat,worldPos,lightCoords);
+                for (int i = 0; i < 2; i++) {
+                    roundedLightCoords[i] = round(lightCoords[i] * SHADOWRESOLUTION);
+                }
+                if (distToL[roundedLightCoords[0]][roundedLightCoords[1]] <= lightCoords[2] +.5 ) {
+                    ch = lit[i];
+                }
+
+
+                if (true) {
+                    // if (pix[1] > HEIGHT/2)
+                    //     ch = '?';
+                    drawPoint(screen,round(pix[0]),round(pix[1]),ch);
+                }
+            }
         } 
     }
 
