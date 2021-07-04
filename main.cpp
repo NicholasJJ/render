@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
   printf("%s",fileName.c_str());
   vector<array<array<float,3>,4>> triangles = objReader(fileName);
 
-  array<float, 3> light = {-1,1,1};
+  array<float, 3> light = {-1,2,1};
   array<float, 3> unitLight = unit(light);
 
   //Light Triangles

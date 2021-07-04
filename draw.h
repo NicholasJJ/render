@@ -6,8 +6,8 @@
 #include "matfunctions.h"
 using namespace std;
 
-#define HEIGHT 40
-#define WIDTH 140
+#define HEIGHT 68
+#define WIDTH 235
 
 #define SHADOWRESOLUTION 2
 
